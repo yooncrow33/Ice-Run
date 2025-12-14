@@ -54,6 +54,9 @@ public class Bullet {
         return traveledDistance >= distance;
     }
 
+    public double getX() {return x;}
+    public double getY() {return y;}
+
     // 터지는 효과 (추후 구현)
     public void explode() {
         // Explosion 애니메이션 또는 사운드 출력

@@ -1,23 +1,27 @@
 package system;
 
-import model.BackGroundIce;
-import model.Orbit;
-import model.PlayerAfterImage;
-import model.Bullet;
+import model.*;
 import view.*;
 import ygk.Base;
 
+import javax.swing.*;
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.KeyEvent;
 import java.util.ArrayList;
 
 public class Main extends Base implements IMove, IMouse, IWeapon, IShoot, IPlayerCoordinate, IStop {
 
+    static final String version = "1.0.1";
+
     //System
-    InputHandler inputHandler = new InputHandler(this, this, this);
+    MouseListener mouseListener = new MouseListener(this,this,this);
+    GraphicsManager gm = new GraphicsManager(this);
 
     ArrayList<BackGroundIce> backGroundIces = new ArrayList<>();
     ArrayList<PlayerAfterImage> playerAfterImages = new ArrayList<>();
     ArrayList<Bullet> bullets = new ArrayList<>();
+    ArrayList<Bomb> bombs = new ArrayList<>();
 
     double dt;
 
@@ -67,8 +71,8 @@ public class Main extends Base implements IMove, IMouse, IWeapon, IShoot, IPlaye
             backGroundIces.add(new BackGroundIce());
         }
 
-        this.addKeyListener(inputHandler);
-        this.addMouseListener(inputHandler);
+        this.addMouseListener(mouseListener);
+        setupKeyBindings();
     }
 
     @Override
@@ -99,6 +103,10 @@ public class Main extends Base implements IMove, IMouse, IWeapon, IShoot, IPlaye
             p.render(g, x, y); // x, y는 플레이어 월드 좌표
         }
 
+        for (Bomb p : bombs) {
+            p.render(g, x, y); // x, y는 플레이어 월드 좌표
+        }
+
         g.setColor(Color.black);
         g.fillRect(20, 900, 530,130);
 
@@ -116,15 +124,15 @@ public class Main extends Base implements IMove, IMouse, IWeapon, IShoot, IPlaye
 
         g.setColor(Color.white);
         g.fillRect(35, 910, 110, 110);
-        g.fillRect(35 + 110 + 20, 910, 110, 110);
-        g.fillRect(35 + 2 * (110 + 20), 910, 110, 110);
-        g.fillRect(35 + 3 * (110 + 20), 910, 110, 110);
+        g.fillRect(165, 910, 110, 110);
+        g.fillRect(295, 910, 110, 110);
+        g.fillRect(425, 910, 110, 110);
 
         g.setColor(Color.black);
         g.drawString(Double.toString(orbit.getOrbitAngle()), 20, 800);
 
         g.setColor(Color.black);
-        renderMap(g);
+        gm.renderMap(g);
     }
 
     @Override
@@ -140,7 +148,19 @@ public class Main extends Base implements IMove, IMouse, IWeapon, IShoot, IPlaye
             p.update(dt);
 
             if (p.isExpired()) {
+                bombs.add(new Bomb(p.getX(), p.getY()));
                 bullets.remove(i);
+            }
+        }
+
+
+        for (int i = bombs.size() - 1; i >= 0; i--) {
+            Bomb p = bombs.get(i);
+
+            p.update();
+
+            if (p.isExpired()) {
+                bombs.remove(i);
             }
         }
 
@@ -169,36 +189,6 @@ public class Main extends Base implements IMove, IMouse, IWeapon, IShoot, IPlaye
         bullets.add(new Bullet(x,y,angle,length));
     }
 
-    public void renderMap(Graphics g) {
-        final int MAP_SCALE = 80;
-
-        final int MINIMAP_X_START = 10;
-        final int MINIMAP_Y_START = 10;
-        final int MINIMAP_WIDTH = WORLD_WIDTH / MAP_SCALE;
-        final int MINIMAP_HEIGHT = WORLD_HEIGHT / MAP_SCALE;
-
-        // 미니맵 배경
-        g.setColor(Color.black);
-        g.fillRect(MINIMAP_X_START - 5, MINIMAP_Y_START - 5, MINIMAP_WIDTH + 10, MINIMAP_HEIGHT + 10);
-        g.setColor(Color.white);
-        g.fillRect(MINIMAP_X_START, MINIMAP_Y_START, MINIMAP_WIDTH, MINIMAP_HEIGHT);
-
-        // 플레이어 좌표 계산
-        // 1. 월드 좌표를 미니맵 크기로 변환
-        double scaledX = x / MAP_SCALE;
-        double scaledY = y / MAP_SCALE;
-
-        // 2. 미니맵의 중앙을 기준으로 현재 위치를 계산 (중앙 오프셋)
-        int mapCenterX = MINIMAP_WIDTH / 2;
-        int mapCenterY = MINIMAP_HEIGHT / 2;
-        int playerMapX = MINIMAP_X_START + mapCenterX + (int)scaledX;
-        int playerMapY = MINIMAP_Y_START + mapCenterY + (int)scaledY;
-
-        // 플레이어 표시
-        g.setColor(Color.red);
-        g.fillRect(playerMapX - 3, playerMapY - 3, 6, 6);
-    }
-
     public void checkBound() {
         if (x > MAN_X) {
             x = MAN_X;
@@ -214,7 +204,63 @@ public class Main extends Base implements IMove, IMouse, IWeapon, IShoot, IPlaye
     }
 
     public static void main(String[] args) {
-        new Main("Ice & Run");
+        new Main("Ice & Run (alpha " + version + ")");
+    }
+
+    private void setupKeyBindings() {
+        // 1. InputMap과 ActionMap을 가져옵니다.
+        // WHEN_IN_FOCUSED_WINDOW: 창이 활성화되어 있는 동안 입력이 작동하도록 설정
+        InputMap im = this.getInputMap(JPanel.WHEN_IN_FOCUSED_WINDOW);
+        ActionMap am = this.getActionMap();
+
+        // --- W 키 (위로 이동) ---
+        // Key Pressed (눌렀을 때)
+        // Key Released (떼었을 때)
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_W, 0, false), "W_PRESS");
+        am.put("W_PRESS", new AbstractAction() {
+            @Override public void actionPerformed(ActionEvent e) { setTrueMoveUp(); }
+        });
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_W, 0, true), "W_RELEASE");
+        am.put("W_RELEASE", new AbstractAction() {
+            @Override public void actionPerformed(ActionEvent e) { setFalseMoveUp(); }
+        });
+
+        // --- S 키 (아래로 이동) ---
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_S, 0, false), "S_PRESS");
+        am.put("S_PRESS", new AbstractAction() {
+            @Override public void actionPerformed(ActionEvent e) { setTrueMoveDown(); }
+        });
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_S, 0, true), "S_RELEASE");
+        am.put("S_RELEASE", new AbstractAction() {
+            @Override public void actionPerformed(ActionEvent e) { setFalseMoveDown(); }
+        });
+
+        // --- A 키 (왼쪽 이동) ---
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_A, 0, false), "A_PRESS");
+        am.put("A_PRESS", new AbstractAction() {
+            @Override public void actionPerformed(ActionEvent e) { setTrueMoveLeft(); }
+        });
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_A, 0, true), "A_RELEASE");
+        am.put("A_RELEASE", new AbstractAction() {
+            @Override public void actionPerformed(ActionEvent e) { setFalseMoveLeft(); }
+        });
+
+        // --- D 키 (오른쪽 이동) ---
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_D, 0, false), "D_PRESS");
+        am.put("D_PRESS", new AbstractAction() {
+            @Override public void actionPerformed(ActionEvent e) { setTrueMoveRight(); }
+        });
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_D, 0, true), "D_RELEASE");
+        am.put("D_RELEASE", new AbstractAction() {
+            @Override public void actionPerformed(ActionEvent e) { setFalseMoveRight(); }
+        });
+
+        // --- SHIFT 키 (무기 변경) ---
+        // SHIFT는 누르는 순간에만 작동하고 뗄 때는 동작이 필요 없으므로 PRESS만 설정
+        im.put(KeyStroke.getKeyStroke(KeyEvent.VK_F, 0, false), "F_PRESS");
+        am.put("F_PRESS", new AbstractAction() {
+            @Override public void actionPerformed(ActionEvent e) { setWeapon(); }
+        });
     }
 
     @Override public void setTrueMoveUp() { moveUp = true; }
